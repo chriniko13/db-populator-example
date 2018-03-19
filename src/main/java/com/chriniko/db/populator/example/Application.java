@@ -20,28 +20,26 @@ public class Application {
                 AppConfiguration.class,
                 PersistenceConfiguration.class);
 
-        DbPopulatorProperties dbPopulatorProperties;
 
         if (args.length != 1) {
 
-            try (InputStream inputStream = Application.class.getClassLoader().getResourceAsStream("application.properties")) {
-                dbPopulatorProperties = loadProperties(inputStream);
-            }
+            System.out.println("Provide configFile.properties in order to run the application.");
+            System.exit(2);
 
-        } else {
-
-            try (InputStream inputStream = Files.newInputStream(Paths.get(args[0]))) {
-                dbPopulatorProperties = loadProperties(inputStream);
-            }
         }
 
-        applicationContext
-                .getBean(PopulatorRunner.class)
-                .run(dbPopulatorProperties.getConcurrency(),
-                        dbPopulatorProperties.getTrafficTarget(),
-                        dbPopulatorProperties.getDuration(),
-                        dbPopulatorProperties.isEqualDistribution()
-                );
+        try (InputStream inputStream = Files.newInputStream(Paths.get(args[0]))) {
+            DbPopulatorProperties dbPopulatorProperties = loadProperties(inputStream);
+
+            applicationContext
+                    .getBean(PopulatorRunner.class)
+                    .run(
+                            dbPopulatorProperties.getConcurrency(),
+                            dbPopulatorProperties.getTrafficTarget(),
+                            dbPopulatorProperties.getDuration(),
+                            dbPopulatorProperties.isEqualDistribution()
+                    );
+        }
 
     }
 

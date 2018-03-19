@@ -3,10 +3,8 @@ package com.chriniko.db.populator.example.configuration;
 import com.zaxxer.hikari.HikariDataSource;
 import org.hibernate.EmptyInterceptor;
 import org.hibernate.Transaction;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
 import org.springframework.orm.hibernate5.HibernateTransactionManager;
 import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
@@ -15,6 +13,10 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.TransactionManagementConfigurer;
 
 import javax.sql.DataSource;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 @Configuration
@@ -24,18 +26,31 @@ import java.util.Properties;
 
 public class PersistenceConfiguration implements TransactionManagementConfigurer {
 
-    @Autowired
-    private Environment environment;
+
+    static Properties PROPERTIES;
+
+    static {
+        PROPERTIES = new Properties();
+
+        try (InputStream inputStream = Files.newInputStream(Paths.get("configFile.properties"))) {
+
+            PROPERTIES.load(inputStream);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     @Bean
     public DataSource dataSource() {
 
         HikariDataSource hikariDataSource = new HikariDataSource();
 
-        hikariDataSource.setUsername(environment.getProperty("jdbc.user"));
-        hikariDataSource.setPassword(environment.getProperty("jdbc.pass"));
-        hikariDataSource.setJdbcUrl(environment.getProperty("jdbc.url"));
-        hikariDataSource.setDriverClassName(environment.getProperty("jdbc.driverClassName"));
+        hikariDataSource.setUsername(PROPERTIES.getProperty("jdbc.user"));
+        hikariDataSource.setPassword(PROPERTIES.getProperty("jdbc.pass"));
+        hikariDataSource.setJdbcUrl(PROPERTIES.getProperty("jdbc.url"));
+        hikariDataSource.setDriverClassName(PROPERTIES.getProperty("jdbc.driverClassName"));
 
         return hikariDataSource;
     }
@@ -93,9 +108,9 @@ public class PersistenceConfiguration implements TransactionManagementConfigurer
     private Properties hibernateProperties() {
         return new Properties() {
             {
-                setProperty("hibernate.hbm2ddl.auto", environment.getProperty("hibernate.hbm2ddl.auto"));
-                setProperty("hibernate.dialect", environment.getProperty("hibernate.dialect"));
-                setProperty("hibernate.show_sql", environment.getProperty("hibernate.show_sql"));
+                setProperty("hibernate.hbm2ddl.auto", PROPERTIES.getProperty("hibernate.hbm2ddl.auto"));
+                setProperty("hibernate.dialect", PROPERTIES.getProperty("hibernate.dialect"));
+                setProperty("hibernate.show_sql", PROPERTIES.getProperty("hibernate.show_sql"));
                 setProperty("hibernate.globally_quoted_identifiers", "true");
             }
         };
