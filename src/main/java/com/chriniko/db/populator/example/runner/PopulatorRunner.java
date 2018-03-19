@@ -3,7 +3,6 @@ package com.chriniko.db.populator.example.runner;
 import com.chriniko.db.populator.example.worker.PopulatorWorker;
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -16,21 +15,6 @@ import java.util.stream.IntStream;
 @Component
 public class PopulatorRunner {
 
-    @Value("${dbpopulator.duration}")
-    private String dbPopulatorDuration;
-    private int dbPopulatorDurationAsInt;
-
-    @Value("${dbpopulator.trafficTarget}")
-    private String trafficTarget;
-    private int trafficTargetAsInt;
-
-    @Value("${dbpopulator.concurrency}")
-    private String concurrency;
-    private int concurrencyAsInt;
-
-    @Value("${dbpopulator.equal.distribution}")
-    private boolean equalDistribution;
-
     @Autowired
     private ObjectFactory<PopulatorWorker> populatorWorkerObjectFactory;
 
@@ -38,11 +22,11 @@ public class PopulatorRunner {
 
     @PostConstruct
     void init() {
-        concurrencyAsInt = Integer.parseInt(concurrency);
-        trafficTargetAsInt = Integer.parseInt(trafficTarget);
-        dbPopulatorDurationAsInt = Integer.parseInt(dbPopulatorDuration);
+        initialize();
+    }
 
-        executorService = Executors.newFixedThreadPool(concurrencyAsInt);
+    private void initialize() {
+        executorService = Executors.newCachedThreadPool();
 
         Runtime.getRuntime()
                 .addShutdownHook(
@@ -53,34 +37,37 @@ public class PopulatorRunner {
                 );
     }
 
-    public void run() {
+    public void run(int concurrency, int trafficTarget, int duration, boolean equalDistribution) {
 
-        if (concurrencyAsInt > trafficTargetAsInt) {
+        if (concurrency > trafficTarget) {
             throw new IllegalStateException("concurrencyAsInt > trafficTargetAsInt");
         }
 
-        final CountDownLatch finishLatch = new CountDownLatch(concurrencyAsInt);
+        final CountDownLatch finishLatch = new CountDownLatch(concurrency);
 
-        double loadPerWorker = (double) trafficTargetAsInt / (double) concurrencyAsInt;
+        double loadPerWorker = (double) trafficTarget / (double) concurrency;
         boolean balancedWork = loadPerWorker % 1 == 0;
 
         if (balancedWork) {
-            balancedWorkProcessing(finishLatch, (int) loadPerWorker);
+            balancedWorkProcessing(finishLatch, (int) loadPerWorker, concurrency, duration);
         } else {
-            unbalancedWorkProcessing(finishLatch, loadPerWorker);
+            unbalancedWorkProcessing(finishLatch, loadPerWorker, concurrency, duration, equalDistribution);
         }
 
         awaitTermination(finishLatch);
     }
 
-    private void balancedWorkProcessing(CountDownLatch finishLatch, int loadPerWorker) {
+    private void balancedWorkProcessing(CountDownLatch finishLatch,
+                                        int loadPerWorker,
+                                        int concurrency,
+                                        int duration) {
 
-        IntStream.range(0, concurrencyAsInt)
+        IntStream.range(0, concurrency)
                 .forEach(idx -> {
 
                     PopulatorWorker populatorWorker = populatorWorkerObjectFactory.getObject();
 
-                    populatorWorker.setDuration(dbPopulatorDurationAsInt);
+                    populatorWorker.setDuration(duration);
                     populatorWorker.setTrafficTargetPerWorker(loadPerWorker);
                     populatorWorker.setCountDownLatch(finishLatch);
 
@@ -89,11 +76,15 @@ public class PopulatorRunner {
                 });
     }
 
-    private void unbalancedWorkProcessing(CountDownLatch finishLatch, double loadPerWorker) {
+    private void unbalancedWorkProcessing(CountDownLatch finishLatch,
+                                          double loadPerWorker,
+                                          int concurrency,
+                                          int duration,
+                                          boolean equalDistribution) {
 
         double missedWork = loadPerWorker % 1;
         double totalMissedWork = 0;
-        for (int i = 0; i < concurrencyAsInt; i++) {
+        for (int i = 0; i < concurrency; i++) {
             totalMissedWork += missedWork;
         }
 
@@ -105,12 +96,12 @@ public class PopulatorRunner {
 
         if (!equalDistribution) {
 
-            for (int i = 0; i < concurrencyAsInt; i++) {
+            for (int i = 0; i < concurrency; i++) {
 
-                boolean isLast = (i == concurrencyAsInt - 1);
+                boolean isLast = (i == concurrency - 1);
 
                 PopulatorWorker populatorWorker = populatorWorkerObjectFactory.getObject();
-                populatorWorker.setDuration(dbPopulatorDurationAsInt);
+                populatorWorker.setDuration(duration);
                 populatorWorker.setCountDownLatch(finishLatch);
 
                 if (isLast) { // Note: add the total missed work to the last worker.
@@ -125,8 +116,8 @@ public class PopulatorRunner {
 
         } else {
 
-            final Integer[] loadPerWorkers = new Integer[concurrencyAsInt];
-            for (int i = 0; i < concurrencyAsInt; i++) {
+            final Integer[] loadPerWorkers = new Integer[concurrency];
+            for (int i = 0; i < concurrency; i++) {
                 loadPerWorkers[i] = (int) loadPerWorker;
             }
 
@@ -147,7 +138,7 @@ public class PopulatorRunner {
             for (Integer load : loadPerWorkers) {
 
                 PopulatorWorker populatorWorker = populatorWorkerObjectFactory.getObject();
-                populatorWorker.setDuration(dbPopulatorDurationAsInt);
+                populatorWorker.setDuration(duration);
                 populatorWorker.setCountDownLatch(finishLatch);
                 populatorWorker.setTrafficTargetPerWorker(load);
 

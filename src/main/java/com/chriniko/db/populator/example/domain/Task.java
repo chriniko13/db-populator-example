@@ -8,11 +8,13 @@ import java.io.Serializable;
 public class Task implements Serializable {
 
     @Id
-    private final String id;
+    private String id;
 
-    private final String name;
-    private final String dueDate;
+    private String name;
+    private String dueDate;
 
+    public Task() {
+    }
 
     public Task(String id, String name, String dueDate) {
         this.id = id;
