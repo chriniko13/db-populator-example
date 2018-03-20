@@ -5,12 +5,12 @@ import org.hibernate.EmptyInterceptor;
 import org.hibernate.Transaction;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
 import org.springframework.orm.hibernate5.HibernateTransactionManager;
 import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.transaction.annotation.TransactionManagementConfigurer;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -24,58 +24,61 @@ import java.util.Properties;
 
 @EnableTransactionManagement
 
-public class PersistenceConfiguration implements TransactionManagementConfigurer {
+public class PersistenceConfiguration {
 
+    // Note: not good coding practise.
+    public static String CONFIG_FILE_NAME = null;
 
-    static Properties PROPERTIES;
+    @Lazy
+    @Bean
+    public Properties properties() throws IOException {
+        Properties properties = new Properties();
 
-    static {
-        PROPERTIES = new Properties();
+        try (InputStream inputStream = Files.newInputStream(Paths.get(CONFIG_FILE_NAME))) {
 
-        try (InputStream inputStream = Files.newInputStream(Paths.get("configFile.properties"))) {
+            properties.load(inputStream);
 
-            PROPERTIES.load(inputStream);
-
-        } catch (IOException e) {
-            e.printStackTrace();
+            return properties;
         }
     }
 
-
+    @Lazy
     @Bean
-    public DataSource dataSource() {
+    public DataSource dataSource(Properties properties) {
 
         HikariDataSource hikariDataSource = new HikariDataSource();
 
-        hikariDataSource.setUsername(PROPERTIES.getProperty("jdbc.user"));
-        hikariDataSource.setPassword(PROPERTIES.getProperty("jdbc.pass"));
-        hikariDataSource.setJdbcUrl(PROPERTIES.getProperty("jdbc.url"));
-        hikariDataSource.setDriverClassName(PROPERTIES.getProperty("jdbc.driverClassName"));
+        hikariDataSource.setUsername(properties.getProperty("jdbc.user"));
+        hikariDataSource.setPassword(properties.getProperty("jdbc.pass"));
+        hikariDataSource.setJdbcUrl(properties.getProperty("jdbc.url"));
+        hikariDataSource.setDriverClassName(properties.getProperty("jdbc.driverClassName"));
 
         return hikariDataSource;
     }
 
 
+    @Lazy
     @Bean
-    public LocalSessionFactoryBean sessionFactory() {
+    public LocalSessionFactoryBean sessionFactory(Properties properties) {
 
         LocalSessionFactoryBean sessionFactory = new LocalSessionFactoryBean();
 
-        sessionFactory.setDataSource(dataSource());
+        sessionFactory.setDataSource(dataSource(properties));
 
         sessionFactory.setPackagesToScan("com.chriniko.db.populator.example.domain");
 
-        sessionFactory.setHibernateProperties(hibernateProperties());
+        sessionFactory.setHibernateProperties(hibernateProperties(properties));
 
         return sessionFactory;
     }
 
+    @Lazy
     @Bean
-    public PlatformTransactionManager transactionManager() {
+    public PlatformTransactionManager transactionManager(Properties properties) {
 
         HibernateTransactionManager hibernateTransactionManager = new HibernateTransactionManager();
 
-        hibernateTransactionManager.setSessionFactory(sessionFactory().getObject());
+        hibernateTransactionManager.setSessionFactory(sessionFactory(properties).getObject());
 
         hibernateTransactionManager.setEntityInterceptor(new EmptyInterceptor() {
 
@@ -100,23 +103,21 @@ public class PersistenceConfiguration implements TransactionManagementConfigurer
     }
 
 
+    @Lazy
     @Bean
     public PersistenceExceptionTranslationPostProcessor exceptionTranslation() {
         return new PersistenceExceptionTranslationPostProcessor();
     }
 
-    private Properties hibernateProperties() {
+    private Properties hibernateProperties(Properties properties) {
         return new Properties() {
             {
-                setProperty("hibernate.hbm2ddl.auto", PROPERTIES.getProperty("hibernate.hbm2ddl.auto"));
-                setProperty("hibernate.dialect", PROPERTIES.getProperty("hibernate.dialect"));
-                setProperty("hibernate.show_sql", PROPERTIES.getProperty("hibernate.show_sql"));
+                setProperty("hibernate.hbm2ddl.auto", properties.getProperty("hibernate.hbm2ddl.auto"));
+                setProperty("hibernate.dialect", properties.getProperty("hibernate.dialect"));
+                setProperty("hibernate.show_sql", properties.getProperty("hibernate.show_sql"));
                 setProperty("hibernate.globally_quoted_identifiers", "true");
             }
         };
     }
 
-    public PlatformTransactionManager annotationDrivenTransactionManager() {
-        return transactionManager();
-    }
 }

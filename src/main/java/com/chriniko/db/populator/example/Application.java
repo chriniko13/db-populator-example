@@ -16,17 +16,18 @@ public class Application {
 
     public static void main(String[] args) throws IOException {
 
-        final ApplicationContext applicationContext = new AnnotationConfigApplicationContext(
-                AppConfiguration.class,
-                PersistenceConfiguration.class);
-
-
         if (args.length != 1) {
 
             System.out.println("Provide configFile.properties in order to run the application.");
             System.exit(2);
 
         }
+
+        PersistenceConfiguration.CONFIG_FILE_NAME = args[0];
+
+        final ApplicationContext applicationContext = new AnnotationConfigApplicationContext(
+                AppConfiguration.class,
+                PersistenceConfiguration.class);
 
         try (InputStream inputStream = Files.newInputStream(Paths.get(args[0]))) {
             DbPopulatorProperties dbPopulatorProperties = loadProperties(inputStream);
